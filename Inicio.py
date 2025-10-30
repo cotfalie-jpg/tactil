@@ -1,13 +1,18 @@
+import os
 import streamlit as st
-from textblob import TextBlob
-from googletrans import Translator
+import base64
+from openai import OpenAI
+import openai
+import numpy as np
+from PIL import Image
+from streamlit_drawable_canvas import st_canvas
 
 # -----------------------------------------------------
-# CONFIGURACIÓN DE ESTILO VISUAL BAE
+# CONFIGURACIÓN DE ESTILO BAE
 # -----------------------------------------------------
-st.set_page_config(page_title="BAE | Análisis de Sentimiento", page_icon="🍼", layout="centered")
+st.set_page_config(page_title="Bae | Tablero Inteligente", page_icon="🍼", layout="centered")
 
-# CSS personalizado (estética BAE)
+# CSS personalizado con la estética de BAE
 st.markdown("""
     <style>
         /* Fondo general */
@@ -17,16 +22,15 @@ st.markdown("""
             font-family: 'Poppins', sans-serif;
         }
 
-        /* Títulos */
+        /* Títulos principales */
         h1, h2, h3 {
             color: #DD8E6B;
             font-weight: 700;
         }
 
-        /* Sidebar */
-        section[data-testid="stSidebar"] {
-            background-color: #FFF2C3;
-            border-right: 2px solid #DD8E6B20;
+        /* Subtítulos */
+        .stSidebar h2, .stSidebar h3 {
+            color: #DD8E6B !important;
         }
 
         /* Botones */
@@ -34,9 +38,9 @@ st.markdown("""
             background-color: #C6E2E3;
             color: #3C3C3C;
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             font-weight: 600;
-            padding: 0.5em 1em;
+            padding: 0.6em 1.2em;
             transition: all 0.3s ease;
         }
         div.stButton > button:first-child:hover {
@@ -45,27 +49,20 @@ st.markdown("""
             transform: scale(1.03);
         }
 
-        /* Expander */
-        [data-testid="stExpander"] {
-            border: 1px solid #C6E2E3;
-            border-radius: 12px;
-            background-color: #FFFDF5;
-        }
-        [data-testid="stExpander"] summary {
-            color: #DD8E6B !important;
-            font-weight: 600;
+        /* Barra lateral */
+        section[data-testid="stSidebar"] {
+            background-color: #FFF2C3;
         }
 
-        /* Campos de texto */
-        textarea, input {
+        /* Inputs */
+        input {
             border-radius: 10px !important;
-            border: 1px solid #DD8E6B40 !important;
-            background-color: #FFFFFF !important;
         }
 
-        /* Texto del sidebar */
-        .stSidebar p, .stSidebar div, .stSidebar span {
-            font-size: 0.9rem;
+        /* Canvas */
+        canvas {
+            border-radius: 16px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
     </style>
 """, unsafe_allow_html=True)
@@ -73,48 +70,82 @@ st.markdown("""
 # -----------------------------------------------------
 # INTERFAZ PRINCIPAL
 # -----------------------------------------------------
-translator = Translator()
-st.title("🍼 Análisis de Sentimiento con BAE")
-st.write("Una herramienta que interpreta el tono emocional de tus textos y sugiere correcciones con ayuda de **IA afectiva**.")
+st.title("🍼 Tablero Inteligente de BAE")
+st.write("Una herramienta interactiva para explorar cómo la inteligencia artificial puede interpretar los primeros bocetos de ideas creativas.")
 
 with st.sidebar:
-    st.subheader("Polaridad y Subjetividad")
-    st.write("""
-    **Polaridad:** Mide si el sentimiento es positivo, negativo o neutral.
-    -1 (muy negativo) → 0 (neutral) → 1 (muy positivo)
+    st.subheader("Acerca de esta app")
+    st.write("En esta aplicación exploramos la capacidad que ahora tiene una máquina de **interpretar un boceto** y describirlo de forma natural.")
+    st.write("Esta versión usa el lenguaje visual y los colores de BAE para mantener una estética cálida y amigable.")
+    st.divider()
 
-    **Subjetividad:** Evalúa cuánto del texto es **opinión** o **hecho**.  
-    0 = objetivo | 1 = muy subjetivo.
-    """)
+# Panel de dibujo
+st.subheader("Dibuja tu boceto 👶")
+st.write("Usa el panel inferior para dibujar tu idea y presiona el botón para analizarla con IA.")
+
+drawing_mode = "freedraw"
+stroke_width = st.sidebar.slider('Selecciona el ancho de línea', 1, 30, 5)
+stroke_color = "#000000"
+bg_color = '#FFF2C3'
+
+canvas_result = st_canvas(
+    fill_color="rgba(221,142,107,0.3)",  # tono salmón con transparencia
+    stroke_width=stroke_width,
+    stroke_color=stroke_color,
+    background_color=bg_color,
+    height=300,
+    width=400,
+    drawing_mode=drawing_mode,
+    key="canvas",
+)
+
+ke = st.text_input("🔑 Ingresa tu Clave de API (OpenAI)", type="password")
+os.environ["OPENAI_API_KEY"] = ke
+api_key = os.environ["OPENAI_API_KEY"]
+client = OpenAI(api_key=api_key)
+
+# Botón para análisis
+analyze_button = st.button("✨ Analizar imagen", type="secondary")
+
+def encode_image_to_base64(image_path):
+    try:
+        with open(image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+            return encoded_image
+    except FileNotFoundError:
+        return None
 
 # -----------------------------------------------------
-# ANÁLISIS DE POLARIDAD Y SUBJETIVIDAD
+# PROCESAMIENTO DE LA IMAGEN
 # -----------------------------------------------------
-with st.expander("💬 Analizar Polaridad y Subjetividad en un texto"):
-    text1 = st.text_area("✏️ Escribe por favor tu texto:", placeholder="Ejemplo: Me encanta aprender cosas nuevas con mi bebé 💕")
-    
-    if text1:
-        translation = translator.translate(text1, src="es", dest="en")
-        blob = TextBlob(translation.text)
-        
-        st.markdown(f"**Polarity:** {round(blob.sentiment.polarity, 2)}")
-        st.markdown(f"**Subjectivity:** {round(blob.sentiment.subjectivity, 2)}")
-        
-        x = round(blob.sentiment.polarity, 2)
-        if x >= 0.5:
-            st.success("✨ Es un sentimiento **Positivo**.")
-        elif x <= -0.5:
-            st.error("😔 Es un sentimiento **Negativo**.")
-        else:
-            st.info("😐 Es un sentimiento **Neutral**.")
+if canvas_result.image_data is not None and api_key and analyze_button:
+    with st.spinner("Analizando tu boceto con amor... 💗"):
+        input_numpy_array = np.array(canvas_result.image_data)
+        input_image = Image.fromarray(input_numpy_array.astype('uint8'), 'RGBA')
+        input_image.save('img.png')
 
-# -----------------------------------------------------
-# CORRECCIÓN EN INGLÉS
-# -----------------------------------------------------
-with st.expander("🧠 Corrección en inglés"):
-    text2 = st.text_area("✏️ Escribe una frase en inglés:", key="4", placeholder="Example: I has a great idea for my baby app.")
-    
-    if text2:
-        blob2 = TextBlob(text2)
-        corrected_text = blob2.correct()
-        st.markdown(f"✅ **Texto corregido:** {corrected_text}")
+        base64_image = encode_image_to_base64("img.png")
+        prompt_text = "Describe brevemente en español la imagen que te muestro."
+
+        try:
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt_text},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}},
+                    ],
+                }],
+                max_tokens=500,
+            )
+
+            if response.choices[0].message.content:
+                st.success("🍼 Análisis completado con éxito:")
+                st.markdown(f"**{response.choices[0].message.content}**")
+
+        except Exception as e:
+            st.error(f"Ocurrió un error al analizar la imagen: {e}")
+else:
+    if not api_key:
+        st.warning("Por favor, ingresa tu clave de API antes de continuar.")
